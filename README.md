@@ -25,5 +25,5 @@ The pipeline is designed to handle high-velocity data streaming through the foll
 
 ## 🛠 Tech Stack
 - **Language**: Python (Pandas, Requests, JSON).
-- **Cloud**: Microsoft Azure (Event Hubs, Stream Analytics).
+- **Cloud**: Microsoft Azure (Event Hubs, Stream Analytics,Database SQL).
 - **BI Tools**: Power BI.
