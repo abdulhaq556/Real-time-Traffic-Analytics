@@ -1,0 +1,134 @@
+Egypt Traffic Intelligence — Training Report  v4.0
+Generated  : 2026-06-29T00:00:40.845107
+Data source: TomTom API / Azure SQL
+Raw file   : D:\R4_MICROSOFT DATA ENGINEER_CA\real-time-Traffic-Analytics_Model\traffic_analysis_project\traffic_analysis_project_v3_with_azure\traffic_analysis_project_v3\data\raw\traffic_2026_06_28_23_01.csv
+Records after cleaning: 5,000
+============================================================
+
+FEATURE AUDIT — Pre-Trip Realism Analysis
+==========================================
+KEPT:
+  hour          ✅ User knows when they plan to travel
+  minute        ✅ Same rationale as hour
+  day_of_week   ✅ User knows what day it is
+  is_weekend    ✅ Derived from day_of_week; always known
+  is_peak_hour  ✅ Derived from hour; captures rush-hour patterns
+  lat / lon     ✅ User selects a road from a dropdown; coords are fixed per road
+  loc_encoded   ✅ Same location info, encoded for models
+
+REMOVED:
+  vehicle_count   ❌ User has NO way to know real-time vehicle counts before leaving
+  speed           ❌ Speed IS what determines congestion (target leak proxy);
+                     also unknown before travelling
+  traffic_density ❌ Derived from removed features
+
+
+Model Comparison Table
+------------------------------------------------------------
+                 Model  Accuracy  Precision  Recall  F1 (weighted)  ROC-AUC      CV Accuracy
+1              XGBoost     0.565     0.5664   0.565         0.5655   0.6851  0.7125 ± 0.0044
+2    Gradient Boosting     0.565     0.5634   0.565         0.5640   0.6855  0.7117 ± 0.0099
+3        Random Forest     0.550     0.5623   0.550         0.5507   0.6813  0.7044 ± 0.0108
+4        Decision Tree     0.539     0.5582   0.539         0.5247   0.6670  0.6755 ± 0.0145
+5                  SVM     0.490     0.5282   0.490         0.4870   0.6398  0.5993 ± 0.0102
+6                  KNN     0.428     0.4883   0.428         0.4390   0.5967  0.6260 ± 0.0099
+7  Logistic Regression     0.441     0.4988   0.441         0.4324   0.5919  0.5484 ± 0.0097
+
+
+🏆 Best Model: XGBoost
+Selection criterion: highest weighted f1
+
+Full classification report for XGBoost:
+              precision    recall  f1-score   support
+
+   Congested       0.41      0.44      0.42       100
+   Free_Flow       0.58      0.60      0.59       381
+    Moderate       0.58      0.56      0.57       519
+
+    accuracy                           0.56      1000
+   macro avg       0.53      0.53      0.53      1000
+weighted avg       0.57      0.56      0.57      1000
+
+
+--- Logistic Regression ---
+              precision    recall  f1-score   support
+
+   Congested       0.25      0.70      0.36       100
+   Free_Flow       0.50      0.61      0.55       381
+    Moderate       0.54      0.27      0.36       519
+
+    accuracy                           0.44      1000
+   macro avg       0.43      0.53      0.42      1000
+weighted avg       0.50      0.44      0.43      1000
+
+
+--- Decision Tree ---
+              precision    recall  f1-score   support
+
+   Congested       0.35      0.57      0.43       100
+   Free_Flow       0.57      0.78      0.66       381
+    Moderate       0.59      0.36      0.45       519
+
+    accuracy                           0.54      1000
+   macro avg       0.50      0.57      0.51      1000
+weighted avg       0.56      0.54      0.52      1000
+
+
+--- Random Forest ---
+              precision    recall  f1-score   support
+
+   Congested       0.38      0.60      0.46       100
+   Free_Flow       0.58      0.63      0.61       381
+    Moderate       0.58      0.48      0.53       519
+
+    accuracy                           0.55      1000
+   macro avg       0.51      0.57      0.53      1000
+weighted avg       0.56      0.55      0.55      1000
+
+
+--- Gradient Boosting ---
+              precision    recall  f1-score   support
+
+   Congested       0.40      0.36      0.38       100
+   Free_Flow       0.59      0.58      0.58       381
+    Moderate       0.58      0.60      0.59       519
+
+    accuracy                           0.56      1000
+   macro avg       0.52      0.51      0.52      1000
+weighted avg       0.56      0.56      0.56      1000
+
+
+--- KNN ---
+              precision    recall  f1-score   support
+
+   Congested       0.19      0.50      0.28       100
+   Free_Flow       0.48      0.52      0.50       381
+    Moderate       0.55      0.35      0.43       519
+
+    accuracy                           0.43      1000
+   macro avg       0.41      0.46      0.40      1000
+weighted avg       0.49      0.43      0.44      1000
+
+
+--- SVM ---
+              precision    recall  f1-score   support
+
+   Congested       0.29      0.66      0.41       100
+   Free_Flow       0.53      0.63      0.57       381
+    Moderate       0.57      0.35      0.44       519
+
+    accuracy                           0.49      1000
+   macro avg       0.47      0.55      0.47      1000
+weighted avg       0.53      0.49      0.49      1000
+
+
+--- XGBoost ---
+              precision    recall  f1-score   support
+
+   Congested       0.41      0.44      0.42       100
+   Free_Flow       0.58      0.60      0.59       381
+    Moderate       0.58      0.56      0.57       519
+
+    accuracy                           0.56      1000
+   macro avg       0.53      0.53      0.53      1000
+weighted avg       0.57      0.56      0.57      1000

@@ -1,0 +1,34 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <clipPath id="circleClip">
+      <circle cx="100" cy="100" r="95" />
+    </clipPath>
+    <linearGradient id="scanner" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#00ffe7" stop-opacity="0" />
+      <stop offset="50%" stop-color="#00ffe7" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#00ffe7" stop-opacity="0" />
+    </linearGradient>
+  </defs>
+  <circle cx="100" cy="100" r="95" fill="#0e1520" stroke="#1e2d42" stroke-width="4"/>
+  <g clip-path="url(#circleClip)" transform="rotate(25 100 100)">
+    <rect x="40" y="-50" width="120" height="300" fill="#131c2e" />
+    <line x1="80" y1="-50" x2="80" y2="250" stroke="#334155" stroke-width="3" stroke-dasharray="15 15" />
+    <line x1="120" y1="-50" x2="120" y2="250" stroke="#334155" stroke-width="3" stroke-dasharray="15 15" />
+    <rect x="52" y="130" width="16" height="32" rx="4" fill="#ef4444" />
+    <rect x="52" y="170" width="16" height="32" rx="4" fill="#ef4444" />
+    <rect x="52" y="210" width="16" height="32" rx="4" fill="#facc15" />
+    <rect x="92" y="110" width="16" height="32" rx="4" fill="#facc15" />
+    <rect x="92" y="150" width="16" height="32" rx="4" fill="#ef4444" />
+    <rect x="92" y="190" width="16" height="32" rx="4" fill="#ef4444" />
+    <rect x="132" y="140" width="16" height="32" rx="4" fill="#ef4444" />
+    <rect x="132" y="180" width="16" height="32" rx="4" fill="#ef4444" />
+    <rect x="40" y="80" width="120" height="15" fill="url(#scanner)" />
+    <line x1="40" y1="87" x2="160" y2="87" stroke="#00ffe7" stroke-width="3" />
+    <line x1="60" y1="0" x2="60" y2="40" stroke="#00ffe7" stroke-width="2" opacity="0.6" stroke-dasharray="5 5" />
+    <line x1="100" y1="-20" x2="100" y2="20" stroke="#00ffe7" stroke-width="2" opacity="0.6" stroke-dasharray="5 5" />
+    <line x1="140" y1="10" x2="140" y2="50" stroke="#00ffe7" stroke-width="2" opacity="0.6" stroke-dasharray="5 5" />
+    <rect x="52" y="-10" width="16" height="32" rx="4" fill="#00ffe7" />
+    <rect x="92" y="-30" width="16" height="32" rx="4" fill="#00ffe7" />
+    <rect x="132" y="0" width="16" height="32" rx="4" fill="#00ffe7" />
+  </g>
+</svg>

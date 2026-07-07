@@ -1,0 +1,40 @@
+{
+  "best_model_name": "XGBoost",
+  "features": [
+    "hour",
+    "minute",
+    "day_of_week",
+    "is_weekend",
+    "is_peak_hour",
+    "lat",
+    "lon",
+    "loc_encoded"
+  ],
+  "trained_at": "2026-06-29T00:00:40.869024",
+  "locations": [
+    "26th July Corridor",
+    "Abbas El Akkad",
+    "Autostrad - Sheraton",
+    "Corniche El Nil",
+    "Faisal Street",
+    "Galaa Square",
+    "Gamaat El Dowal St",
+    "Mosheer Tantawy Axis",
+    "North 90th Street",
+    "October Bridge",
+    "Ring Road - Maadi",
+    "Ring Road - Marg",
+    "Ring Road - Moneeb",
+    "Rod El Farag Axis",
+    "Salah Salem",
+    "South 90th Street",
+    "Tahrir Square"
+  ],
+  "classes": [
+    "Congested",
+    "Free_Flow",
+    "Moderate"
+  ],
+  "n_records": 5000,
+  "data_source": "TomTom API"
+}
