@@ -1,4 +1,4 @@
-# 🚦 Smart Traffic Egypt: Real-Time Analytics & ML Pipeline
+<img width="1236" height="676" alt="Dashboard" src="https://github.com/user-attachments/assets/9c179fc4-6dee-4661-bf68-531f90003bbf" /># 🚦 Smart Traffic Egypt: Real-Time Analytics & ML Pipeline
 
 [![Presentation](https://img.shields.io/badge/Presentation-View_Slides-blue?style=for-the-badge&logo=canva)](https://canva.link/t7jfgiytlm331u9)
 
@@ -17,7 +17,7 @@ An end-to-end Data Engineering and Machine Learning ecosystem designed to ingest
 
 ---
 
-## 🎯 The Problem & Our Solution
+## The Problem & Our Solution
 
 **The Challenge:** 
 Traffic congestion in metropolitan areas like Cairo fluctuates rapidly. Traditional routing apps tell you the current state, but they lack predictive foresight and deep analytical context for city planners.
@@ -29,11 +29,11 @@ We built a dual-purpose intelligence system:
 
 ---
 
-## 🏗 System Architecture
+## System Architecture
 
 Our pipeline is designed for high velocity and fault tolerance.
 
-![System Architecture](images/Architecture.png)
+![System Architecture](images/Architecture.jpeg)
 
 1. **Extraction:** A custom Python ETL script continuously pulls live telemetry (Speed, Travel Time, Congestion level) from the **TomTom Traffic API**.
 2. **Streaming:** Data is pushed as JSON payloads into **Azure Event Hubs**.
@@ -43,7 +43,7 @@ Our pipeline is designed for high velocity and fault tolerance.
 
 ---
 
-## ⚙️ Phase 1: Data Engineering & Cloud Infrastructure
+## Phase 1: Data Engineering & Cloud Infrastructure
 
 The backbone of this project is a robust data pipeline built on Microsoft Azure:
 * **Live Ingestion:** Handling continuous API requests without throttling.
@@ -52,7 +52,7 @@ The backbone of this project is a robust data pipeline built on Microsoft Azure:
 
 ---
 
-## 🧠 Phase 2: Machine Learning Engine
+## Phase 2: Machine Learning Engine
 
 To move from monitoring to prediction, we developed a classification model:
 * **Algorithm:** **XGBoost Classifier** (Chosen for its high performance with tabular data and speed during inference).
@@ -62,18 +62,18 @@ To move from monitoring to prediction, we developed a classification model:
 
 ---
 
-## 📊 Phase 3: Business Intelligence (Power BI)
+## Phase 3: Business Intelligence (Power BI)
 
 Designed for city officials and traffic management centers.
 * **Live Monitoring:** Real-time KPI cards showing Total Records, Active Locations, and Average Network Speed.
 * **Geospatial Heatmaps:** Visualizing current congestion nodes on a live map of Cairo.
 * **Alerts:** Automated tracking of severe congestion events.
 
-> ![Power BI Dashboard](images/Dashboard.png)
+> ![Power BI Dashboard](images)
 
 ---
 
-## 💻 Phase 4: User Application (Streamlit)
+## Phase 4: User Application (Streamlit)
 
 A lightweight, interactive web application acting as the frontend for our ML model.
 
@@ -91,7 +91,7 @@ Users can explore historical patterns through interactive visual plots:
 
 ---
 
-## 🚀 Getting Started & Installation
+## Getting Started & Installation
 
 To run the Streamlit application and ETL simulator locally:
 
