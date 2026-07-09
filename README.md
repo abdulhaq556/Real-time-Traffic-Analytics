@@ -1,7 +1,6 @@
 # 🚦 Smart Traffic Egypt: Real-Time Analytics & ML Pipeline
 
-[![Presentation]([https://img.shields.io/badge/Presentation-View_Slides-blue?style=for-the-badge&logo=canva](https://canva.link/t7jfgiytlm331u9))](#)
-
+[![Presentation](https://img.shields.io/badge/Presentation-View_Slides-blue?style=for-the-badge&logo=canva)](https://canva.link/t7jfgiytlm331u9)
 
 An end-to-end Data Engineering and Machine Learning ecosystem designed to ingest, process, predict, and visualize live traffic telemetry data from major Egyptian road networks. 
 
@@ -34,7 +33,7 @@ We built a dual-purpose intelligence system:
 
 Our pipeline is designed for high velocity and fault tolerance.
 
-> **[Insert Architecture Diagram Here]**
+![System Architecture](images/Architecture.png)
 
 1. **Extraction:** A custom Python ETL script continuously pulls live telemetry (Speed, Travel Time, Congestion level) from the **TomTom Traffic API**.
 2. **Streaming:** Data is pushed as JSON payloads into **Azure Event Hubs**.
@@ -70,7 +69,7 @@ Designed for city officials and traffic management centers.
 * **Geospatial Heatmaps:** Visualizing current congestion nodes on a live map of Cairo.
 * **Alerts:** Automated tracking of severe congestion events.
 
-> **[Insert Power BI Dashboard Screenshot Here]**
+> ![Power BI Dashboard](images/Dashboard.png)
 
 ---
 
@@ -88,7 +87,7 @@ Users can explore historical patterns through interactive visual plots:
 * **24-Hour Optimization:** The user selects a route, and the system simulates predictions for the next 24 hours, plotting a graph to highlight the **Best (Safest)** and **Worst** times to travel.
 * **Multi-Route Comparison:** Users input two alternative routes. The system evaluates both concurrently and flags the `FASTEST` route based on the highest model confidence.
 
-> **[Insert Streamlit Prediction & 24-Hour Graph Screenshots Here]**
+> ![Smart Prediction](images/prediction.png)
 
 ---
 
