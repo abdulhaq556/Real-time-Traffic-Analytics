@@ -1,4 +1,4 @@
-<img width="1236" height="676" alt="Dashboard" src="https://github.com/user-attachments/assets/9c179fc4-6dee-4661-bf68-531f90003bbf" /># 🚦 Smart Traffic Egypt: Real-Time Analytics & ML Pipeline
+Smart Traffic Egypt: Real-Time Analytics & ML Pipeline
 
 [![Presentation](https://img.shields.io/badge/Presentation-View_Slides-blue?style=for-the-badge&logo=canva)](https://canva.link/t7jfgiytlm331u9)
 
@@ -6,7 +6,7 @@ An end-to-end Data Engineering and Machine Learning ecosystem designed to ingest
 
 ---
 
-## 📖 Table of Contents
+## Table of Contents
 1. [The Problem & Our Solution](#-the-problem--our-solution)
 2. [System Architecture](#-system-architecture)
 3. [Phase 1: Data Engineering & Cloud Infrastructure](#-phase-1-data-engineering--cloud-infrastructure)
@@ -69,7 +69,7 @@ Designed for city officials and traffic management centers.
 * **Geospatial Heatmaps:** Visualizing current congestion nodes on a live map of Cairo.
 * **Alerts:** Automated tracking of severe congestion events.
 
-> ![Power BI Dashboard](images)
+<img width="1236" height="676" alt="Dashboard" src="https://github.com/user-attachments/assets/9c179fc4-6dee-4661-bf68-531f90003bbf" /># 
 
 ---
 
@@ -87,7 +87,8 @@ Users can explore historical patterns through interactive visual plots:
 * **24-Hour Optimization:** The user selects a route, and the system simulates predictions for the next 24 hours, plotting a graph to highlight the **Best (Safest)** and **Worst** times to travel.
 * **Multi-Route Comparison:** Users input two alternative routes. The system evaluates both concurrently and flags the `FASTEST` route based on the highest model confidence.
 
-> ![Smart Prediction](images/prediction.png)
+<img width="1879" height="924" alt="prediction" src="https://github.com/user-attachments/assets/e555a98b-90e7-4cc3-b086-cc46b550a0a4" />
+
 
 ---
 
