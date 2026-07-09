@@ -1,4 +1,4 @@
-Smart Traffic Egypt: Real-Time Analytics & ML Pipeline
+# Smart Traffic Egypt: Real-Time Analytics & ML Pipeline
 
 [![Presentation](https://img.shields.io/badge/Presentation-View_Slides-blue?style=for-the-badge&logo=canva)](https://canva.link/t7jfgiytlm331u9)
 
@@ -81,6 +81,9 @@ A lightweight, interactive web application acting as the frontend for our ML mod
 Users can explore historical patterns through interactive visual plots:
 * Congestion Heatmaps (Hour vs. Day of Week).
 * Speed Distributions and Feature Correlation Matrices.
+
+<img width="1879" height="916" alt="streamlit" src="https://github.com/user-attachments/assets/0d685773-f49b-42dc-989c-b8dc18231d68" />
+
 
 ### 2. Smart Prediction & Trip Planner
 * **Confidence Breakdown:** Instead of a simple output, the app displays the exact probability for each traffic state.
