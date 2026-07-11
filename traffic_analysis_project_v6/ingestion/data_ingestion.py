@@ -1,8 +1,5 @@
-
-
 import sys
 sys.stdout.reconfigure(encoding="utf-8")
-
 import os
 import glob
 import time
@@ -11,7 +8,6 @@ import argparse
 import random
 from datetime import datetime, timezone
 from typing import Optional
-
 import pandas as pd
 import requests
 
@@ -120,7 +116,7 @@ def _fetch_location(loc: dict, cfg: dict, session: requests.Session) -> Optional
                     f"403 Forbidden for {loc['name']}. "
                     "Check your API key on the TomTom Developer Portal."
                 )
-                return None  # Permanent — do not retry auth errors
+                return None  
 
             elif resp.status_code == 429:
                 wait = backoff * (2 ** attempt)
@@ -184,7 +180,7 @@ _BASE_FREE_FLOW = {
     "North 90th Street":      70,
     "South 90th Street":      65,
 }
-_DEFAULT_FREE_FLOW = 70  # Fallback for any future location not listed above
+_DEFAULT_FREE_FLOW = 70  
 
 
 def _simulate_record(loc: dict, timestamp: datetime) -> dict:
