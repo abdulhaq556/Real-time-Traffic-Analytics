@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 import warnings
 import argparse
 import json
@@ -90,6 +91,293 @@ REMOVED:
                      also unknown before travelling
   traffic_density ❌ Derived from removed features
 """
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# VERBOSE REPORTING HELPERS
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _pct(part, whole):
+    return (part / whole * 100) if whole else 0.0
+
+
+def print_validation_summary(df: pd.DataFrame, findings: dict) -> str:
+    n_rows = len(df)
+    n_cols = len(df.columns)
+
+    lines = []
+    lines.append("\n## Validation Summary")
+    lines.append(f"\nRows: {n_rows:,}")
+    lines.append(f"Columns: {n_cols}")
+
+    null_counts = findings.get("null_counts", {})
+    non_zero_nulls = {c: v for c, v in null_counts.items() if v > 0}
+    lines.append("\nMissing Values:")
+    if non_zero_nulls:
+        for col, cnt in non_zero_nulls.items():
+            lines.append(f"{col:<20s}{cnt:>6,} ({_pct(cnt, n_rows):.2f}%)")
+    else:
+        lines.append("None")
+
+    if "bad_timestamps" in findings:
+        lines.append(f"\nInvalid Timestamps: {findings['bad_timestamps']:,}")
+
+    unknown_locs = findings.get("unknown_locations", [])
+    lines.append("\nUnknown Locations:")
+    lines.append(f"{len(unknown_locs)}")
+    if unknown_locs:
+        lines.append(f"Names: {', '.join(map(str, unknown_locs))}")
+
+    lines.append(f"\nDuplicate Rows:\n{findings.get('duplicate_rows', 0):,}")
+
+    inf_map = findings.get("infinite_values", {})
+    total_inf = sum(inf_map.values()) if inf_map else 0
+    lines.append(f"\nInfinite Values: {total_inf:,}")
+    if total_inf:
+        for col, cnt in inf_map.items():
+            if cnt:
+                lines.append(f"  {col:<20s}{cnt:>6,}")
+
+    bad_lat = findings.get("out_of_range_lat", 0)
+    bad_lon = findings.get("out_of_range_lon", 0)
+    lines.append(f"\nInvalid Coordinates: {bad_lat + bad_lon:,}  (lat={bad_lat:,}, lon={bad_lon:,})")
+
+    lines.append(f"\nInvalid Traffic Status Values: {findings.get('invalid_traffic_status', 0):,}")
+    lines.append(f"Negative Vehicle Counts: {findings.get('negative_vehicle_count', 0):,}")
+    lines.append(f"Invalid Speeds: {findings.get('non_positive_speed', 0):,}")
+
+    warning_total = (
+        len(non_zero_nulls) + findings.get("bad_timestamps", 0)
+        + len(unknown_locs) + findings.get("duplicate_rows", 0)
+        + total_inf + bad_lat + bad_lon
+        + findings.get("invalid_traffic_status", 0)
+        + findings.get("negative_vehicle_count", 0)
+        + findings.get("non_positive_speed", 0)
+    )
+    verdict = "PASS" if warning_total == 0 else "PASS WITH WARNINGS"
+    lines.append(f"\nValidation Result:\n{verdict}")
+
+    report = "\n".join(lines)
+    print(report)
+    return report
+
+
+def print_cleaning_summary(n_before: int, n_after: int, removed: dict) -> str:
+    lines = []
+    lines.append("\n## Cleaning Summary")
+    lines.append(f"\nRows Before Cleaning: {n_before:,}")
+    lines.append(f"Rows After Cleaning : {n_after:,}")
+
+    lines.append("\nRemoved:")
+    any_removed = False
+    for label, cnt in removed.items():
+        if cnt:
+            any_removed = True
+            lines.append(f"* {cnt:,} {label}")
+    if not any_removed:
+        lines.append("* None")
+
+    total_removed = n_before - n_after
+    lines.append(f"\nTotal Removed:\n{total_removed:,} rows")
+
+    retention = _pct(n_after, n_before)
+    lines.append(f"\nRetention Rate:\n{retention:.2f}%")
+
+    report = "\n".join(lines)
+    print(report)
+    return report
+
+
+def print_feature_snapshot(df: pd.DataFrame, generated_features: list) -> None:
+    print("\nGenerated Features:")
+    for feat in generated_features:
+        print(feat)
+
+    present = [f for f in generated_features if f in df.columns]
+    print("\n## Feature Snapshot:\n")
+    print(df[present].head(5).to_string(index=False))
+
+    print("\nData Types:")
+    print(df[present].dtypes.to_string())
+
+    print("\nNull Counts After Feature Engineering:")
+    nulls = df[present].isnull().sum()
+    if nulls.sum() == 0:
+        print("None")
+    else:
+        print(nulls[nulls > 0].to_string())
+
+
+def print_location_audit(df: pd.DataFrame) -> None:
+    configured = set(LOCATION_NAMES)
+    found = set(df["location_name"].dropna().unique()) if "location_name" in df.columns else set()
+
+    missing = configured - found
+    new = found - configured
+
+    print("\n## Location Audit")
+    print(f"\nConfigured Locations: {len(configured)}")
+    print(f"Found Locations: {len(found)}")
+    print("\nMissing:")
+    print("None" if not missing else ", ".join(sorted(missing)))
+    print("\nNew:")
+    print("None" if not new else ", ".join(sorted(new)))
+
+
+def print_target_distribution(df: pd.DataFrame, target_col: str = "traffic_status") -> None:
+    counts = df[target_col].value_counts()
+    total = counts.sum()
+
+    print("\n## Target Distribution")
+    print()
+    for label, cnt in counts.items():
+        print(f"{label:<12s} {cnt:>6,} ({_pct(cnt, total):.1f}%)")
+
+    if len(counts) >= 2 and counts.min() > 0:
+        imbalance_ratio = counts.max() / counts.min()
+        print(f"\nImbalance Ratio (max:min): {imbalance_ratio:.2f} : 1")
+
+
+def print_split_summary(
+    X_train, X_test, y_train, y_test, target_encoder: LabelEncoder,
+    y_full=None,
+) -> None:
+    class_names = target_encoder.classes_
+
+    print("\n## Train / Test Split")
+    print(f"\nTrain Shape: {X_train.shape}")
+    print(f"Test Shape : {X_test.shape}")
+    print(f"Feature Count: {X_train.shape[1]}")
+
+    if y_full is not None:
+        full_counts = pd.Series(target_encoder.inverse_transform(y_full)).value_counts()
+        print("\nClass Distribution Before Split:")
+        print(full_counts.to_string())
+
+    train_counts = pd.Series(target_encoder.inverse_transform(y_train)).value_counts()
+    test_counts = pd.Series(target_encoder.inverse_transform(y_test)).value_counts()
+
+    print("\nClass Distribution After Split (Train):")
+    print(train_counts.to_string())
+    print("\nClass Distribution After Split (Test):")
+    print(test_counts.to_string())
+
+
+def print_feature_audit(df: pd.DataFrame, feature_cols: list) -> None:
+    print("\n## Feature Audit")
+    print(f"\n{'Column':<20s}{'Nulls':>10s}{'Unique':>10s}")
+
+    constant_cols = []
+    near_constant_cols = []
+    nan_cols = []
+    inf_cols = []
+
+    for col in feature_cols:
+        if col not in df.columns:
+            continue
+        s = df[col]
+        nulls = int(s.isnull().sum())
+        unique = int(s.nunique(dropna=True))
+        print(f"{col:<20s}{nulls:>10,}{unique:>10,}")
+
+        if unique <= 1:
+            constant_cols.append(col)
+        elif s.dtype.kind in "if":
+            top_freq = s.value_counts(normalize=True, dropna=True)
+            if not top_freq.empty and top_freq.iloc[0] >= 0.95:
+                near_constant_cols.append(col)
+
+        if nulls > 0:
+            nan_cols.append(col)
+
+        if s.dtype.kind == "f" and np.isinf(s).sum() > 0:
+            inf_cols.append(col)
+
+    print("\nConstant Columns:")
+    print("None" if not constant_cols else ", ".join(constant_cols))
+    print("\nNear-Constant Columns (>=95% single value):")
+    print("None" if not near_constant_cols else ", ".join(near_constant_cols))
+    print("\nColumns With NaN:")
+    print("None" if not nan_cols else ", ".join(nan_cols))
+    print("\nColumns With Infinite Values:")
+    print("None" if not inf_cols else ", ".join(inf_cols))
+
+
+def print_smote_report(before_counts: dict, after_counts: dict = None, failure_reason: str = None,
+                        nan_report: dict = None) -> None:
+    print("\n## SMOTE Resampling")
+    print("\nBefore SMOTE:\n")
+    for label, cnt in before_counts.items():
+        print(f"{label:<10s}: {cnt:,}")
+
+    if failure_reason:
+        print(f"\nSMOTE FAILED: {failure_reason}")
+        if nan_report:
+            print("\nColumns With NaN:")
+            for col, cnt in nan_report.items():
+                if cnt:
+                    print(f"{col:<20s}{cnt:,}")
+        return
+
+    if after_counts:
+        print("\nAfter SMOTE:\n")
+        for label, cnt in after_counts.items():
+            print(f"{label:<10s}: {cnt:,}")
+        rows_added = sum(after_counts.values()) - sum(before_counts.values())
+        print(f"\nRows Added:\n{rows_added:,}")
+
+
+def print_ranking_table(results: dict, metric: str = "f1") -> str:
+    ranked = sorted(results.items(), key=lambda kv: kv[1][metric], reverse=True)
+
+    lines = ["\n## Rank   Model                 " + metric.upper()]
+    for i, (name, r) in enumerate(ranked, start=1):
+        lines.append(f"{i:<6d} {name:<20s}  {r[metric]:.4f}")
+
+    winner_name = ranked[0][0]
+    lines.append(f"\nWinner:\n{winner_name}")
+    lines.append(f"\nReason:\nHighest weighted {metric.upper()}-score.")
+
+    report = "\n".join(lines)
+    print(report)
+    return report
+
+
+def print_artifact_sizes(paths: list) -> None:
+    print("\n## Artifacts Saved")
+    for p in paths:
+        if os.path.exists(p):
+            size_kb = os.path.getsize(p) / 1024
+            print(f"{p}  ({size_kb:,.1f} KB)")
+        else:
+            print(f"{p}  (NOT FOUND)")
+
+
+def print_final_report(
+    input_rows: int, rows_removed: int, rows_used: int,
+    feature_cols: list, target_col: str,
+    models_trained: int, best_name: str, best_f1: float,
+    training_time_sec: float, artifact_paths: list, status: str = "SUCCESS",
+) -> str:
+    lines = []
+    lines.append("\n" + "=" * 48)
+    lines.append("PIPELINE EXECUTION SUMMARY")
+    lines.append("=" * 26)
+    lines.append(f"\nInput Rows:\n{input_rows:,}")
+    lines.append(f"\nRows Removed:\n{rows_removed:,}")
+    lines.append(f"\nRows Used:\n{rows_used:,}")
+    lines.append(f"\nFeatures:\n{', '.join(feature_cols)}")
+    lines.append(f"\nTarget:\n{target_col}")
+    lines.append(f"\nModels Trained:\n{models_trained}")
+    lines.append(f"\nBest Model:\n{best_name}")
+    lines.append(f"\nBest F1:\n{best_f1:.4f}")
+    lines.append(f"\nTraining Time:\n{training_time_sec:.2f} sec")
+    lines.append("\nArtifacts Saved:\n" + ", ".join(os.path.basename(p) for p in artifact_paths))
+    lines.append(f"\nPipeline Status:\n{status}")
+
+    report = "\n".join(lines)
+    print(report)
+    return report
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -240,6 +528,7 @@ def validate_raw_data(df: pd.DataFrame) -> dict:
         log.info("[Validation] ✅ No infinite values in numeric columns.")
 
     log.info("[Validation] Raw data audit complete.")
+    print_validation_summary(df, findings)
     return findings
 
 
@@ -251,6 +540,16 @@ def _clean_raw(df: pd.DataFrame) -> pd.DataFrame:
     
     n_start = len(df)
     log.info(f"[Cleaning] Starting with {n_start:,} rows.")
+    removed = {
+        "duplicate rows": 0,
+        "invalid timestamps": 0,
+        "unknown locations": 0,
+        "invalid coordinate records": 0,
+        "infinite value rows": 0,
+        "invalid speed rows": 0,
+        "invalid vehicle_count rows": 0,
+        "invalid traffic_status rows": 0,
+    }
 
     # ── Column aliases (Azure SQL schema compatibility) ────────────────────
     rename_map = {}
@@ -267,6 +566,7 @@ def _clean_raw(df: pd.DataFrame) -> pd.DataFrame:
     inf_mask = df[num_cols].isin([np.inf, -np.inf]).any(axis=1)
     if inf_mask.sum():
         df = df[~inf_mask]
+        removed["infinite value rows"] += int(inf_mask.sum())
         log.warning(f"[Cleaning] Dropped {inf_mask.sum()} rows containing infinite values. "
                     f"Remaining: {len(df):,}")
 
@@ -275,6 +575,7 @@ def _clean_raw(df: pd.DataFrame) -> pd.DataFrame:
     df = df.drop_duplicates()
     dropped = before - len(df)
     if dropped:
+        removed["duplicate rows"] += dropped
         log.info(f"[Cleaning] Dropped {dropped} exact duplicate rows. Remaining: {len(df):,}")
 
     # ── Timestamp: parse with ISO-8601-tolerant parser, then drop NaT ─────
@@ -284,6 +585,7 @@ def _clean_raw(df: pd.DataFrame) -> pd.DataFrame:
         df = df.dropna(subset=["timestamp"])
         dropped = before - len(df)
         if dropped:
+            removed["invalid timestamps"] += dropped
             log.warning(f"[Cleaning] Dropped {dropped} rows with unparseable timestamps. "
                         f"Remaining: {len(df):,}")
 
@@ -302,6 +604,7 @@ def _clean_raw(df: pd.DataFrame) -> pd.DataFrame:
             df = df[~unknown_mask]
         dropped = before - len(df)
         if dropped:
+            removed["unknown locations"] += dropped
             log.info(f"[Cleaning] Dropped {dropped} rows with invalid location names. "
                      f"Remaining: {len(df):,}")
 
@@ -321,6 +624,7 @@ def _clean_raw(df: pd.DataFrame) -> pd.DataFrame:
             df       = df[~bad_mask]
             dropped  = before - len(df)
             if dropped:
+                removed["invalid coordinate records"] += dropped
                 log.warning(f"[Cleaning] Dropped {dropped} rows with invalid {col}. "
                             f"Remaining: {len(df):,}")
 
@@ -331,6 +635,7 @@ def _clean_raw(df: pd.DataFrame) -> pd.DataFrame:
         df     = df[df["speed"] > 0]
         dropped = before - len(df)
         if dropped:
+            removed["invalid speed rows"] += dropped
             log.warning(f"[Cleaning] Dropped {dropped} rows with missing or non-positive speed. "
                         f"Remaining: {len(df):,}")
 
@@ -341,6 +646,7 @@ def _clean_raw(df: pd.DataFrame) -> pd.DataFrame:
         df     = df[df["vehicle_count"] >= 0]
         dropped = before - len(df)
         if dropped:
+            removed["invalid vehicle_count rows"] += dropped
             log.warning(f"[Cleaning] Dropped {dropped} rows with invalid vehicle_count. "
                         f"Remaining: {len(df):,}")
 
@@ -353,6 +659,7 @@ def _clean_raw(df: pd.DataFrame) -> pd.DataFrame:
             df = df[~bad_label]
         dropped = before - len(df)
         if dropped:
+            removed["invalid traffic_status rows"] += dropped
             log.info(f"[Cleaning] After label cleaning: {len(df):,} rows.")
 
     n_end   = len(df)
@@ -361,6 +668,7 @@ def _clean_raw(df: pd.DataFrame) -> pd.DataFrame:
         f"[Cleaning] Complete. {n_end:,} clean rows remain "
         f"(dropped {n_dropped:,} = {n_dropped/max(n_start,1)*100:.1f}%)."
     )
+    print_cleaning_summary(n_start, n_end, removed)
     return df.reset_index(drop=True)
 
 
@@ -416,6 +724,12 @@ def _engineer_features(
         f"[Engineering] Complete. Shape: {df.shape}. "
         f"Target distribution:\n{df['traffic_status'].value_counts().to_string()}"
     )
+
+    generated_features = ["hour", "minute", "day_of_week", "is_weekend", "is_peak_hour"]
+    print_feature_snapshot(df, generated_features)
+    print_location_audit(df)
+    print_target_distribution(df, target_col="traffic_status")
+
     return df, loc_encoder, target_encoder
 
 
@@ -501,12 +815,13 @@ def validate_feature_matrix(df: pd.DataFrame) -> None:
 
 def load_and_engineer(
     csv_path: str,
-) -> tuple[pd.DataFrame, LabelEncoder, LabelEncoder]:
+) -> tuple[pd.DataFrame, LabelEncoder, LabelEncoder, int]:
     
     log.info(f"[Load] Reading: {csv_path}")
     # Do NOT pass parse_dates here — let _parse_timestamp handle the mixed format
     df = pd.read_csv(csv_path)
-    log.info(f"[Load] {len(df):,} rows loaded, columns: {df.columns.tolist()}")
+    n_raw_rows = len(df)
+    log.info(f"[Load] {n_raw_rows:,} rows loaded, columns: {df.columns.tolist()}")
 
     # ── Stage 1: Raw data audit (non-destructive — logging only) ──────────
     validate_raw_data(df)
@@ -526,14 +841,14 @@ def load_and_engineer(
     # ── Stage 4: Feature matrix validation (destructive check — will raise) ─
     validate_feature_matrix(df)
 
-    return df, loc_encoder, target_encoder
+    return df, loc_encoder, target_encoder, n_raw_rows
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # STEP 2: PREPROCESSING  (split → scale → SMOTE)
 # ══════════════════════════════════════════════════════════════════════════════
 
-def preprocess(df: pd.DataFrame, use_smote: bool = True):
+def preprocess(df: pd.DataFrame, use_smote: bool = True, target_encoder: Optional[LabelEncoder] = None):
     
     X = df[FEATURE_COLS].values
     y = df["target_enc"].values
@@ -567,6 +882,9 @@ def preprocess(df: pd.DataFrame, use_smote: bool = True):
     )
     log.info(f"[Preprocess] Train: {X_train.shape[0]:,}  Test: {X_test.shape[0]:,}")
 
+    if target_encoder is not None:
+        print_split_summary(X_train, X_test, y_train, y_test, target_encoder, y_full=y)
+
     # ── Scaling ────────────────────────────────────────────────────────────
     scaler  = StandardScaler()
     X_train = scaler.fit_transform(X_train)
@@ -578,6 +896,13 @@ def preprocess(df: pd.DataFrame, use_smote: bool = True):
         min_class    = class_counts.min()
         n_classes    = len(class_counts)
 
+        def _named(counts_array):
+            if target_encoder is not None:
+                return {target_encoder.inverse_transform([i])[0]: int(c) for i, c in enumerate(counts_array)}
+            return {f"class_{i}": int(c) for i, c in enumerate(counts_array)}
+
+        before_named = _named(class_counts)
+
         # SMOTE requires at least k_neighbors + 1 samples per class (default k=5 → need ≥6)
         smote_k = min(5, min_class - 1)
         if smote_k < 1:
@@ -585,19 +910,29 @@ def preprocess(df: pd.DataFrame, use_smote: bool = True):
                 f"[Preprocess] SMOTE skipped: smallest class has only {min_class} sample(s) "
                 f"in training set — need at least 2. Using raw class distribution."
             )
+            nan_report = {f"feature_{i}": int(np.isnan(X_train[:, i]).sum()) for i in range(X_train.shape[1])}
+            print_smote_report(
+                before_named,
+                failure_reason=f"smallest class has only {min_class} sample(s); need at least 2.",
+                nan_report=nan_report,
+            )
         else:
             try:
                 sm          = SMOTE(random_state=TRAINING["random_state"], k_neighbors=smote_k)
                 X_train, y_train = sm.fit_resample(X_train, y_train)
+                after_named = _named(np.bincount(y_train))
                 log.info(
                     f"[Preprocess] SMOTE complete (k={smote_k}). "
                     f"Train size after resampling: {X_train.shape[0]:,}"
                 )
+                print_smote_report(before_named, after_counts=after_named)
             except Exception as exc:
                 log.warning(
                     f"[Preprocess] SMOTE failed: {exc}. "
                     "Continuing with raw class distribution."
                 )
+                nan_report = {f"feature_{i}": int(np.isnan(X_train[:, i]).sum()) for i in range(X_train.shape[1])}
+                print_smote_report(before_named, failure_reason=str(exc), nan_report=nan_report)
 
     return X_train, X_test, y_train, y_test, scaler
 
@@ -661,8 +996,13 @@ def train_and_evaluate(
 
     for name, model in models.items():
         log.info(f"[Training] Fitting {name}…")
+        print(f"\n---\n\n## Training {name}\n")
         try:
+            fit_start = time.time()
             model.fit(X_train, y_train)
+            fit_time = time.time() - fit_start
+            print(f"Training Time: {fit_time:.2f} sec")
+
             y_pred = model.predict(X_test)
             y_prob = model.predict_proba(X_test) if hasattr(model, "predict_proba") else None
 
@@ -691,6 +1031,19 @@ def train_and_evaluate(
             else:
                 cv_scores = np.array([acc])
                 log.warning(f"[Training] Cross-validation skipped for {name} (insufficient samples).")
+
+            print("\nCross Validation Scores:")
+            for fold_i, score in enumerate(cv_scores, start=1):
+                print(f"Fold{fold_i}: {score:.4f}")
+            print(f"\nCV Mean: {cv_scores.mean():.4f}")
+            print(f"CV Std: {cv_scores.std():.4f}")
+
+            print("\nTest Metrics:")
+            print(f"Accuracy:  {acc:.4f}")
+            print(f"Precision: {prec:.4f}")
+            print(f"Recall:    {rec:.4f}")
+            print(f"F1:        {f1:.4f}")
+            print(f"ROC-AUC:   {auc:.4f}")
 
             # ── Confusion matrix plot ──────────────────────────────────────
             
@@ -887,6 +1240,16 @@ def save_artifacts(
 
     log.info(f"[Artifacts] ✅ Best model ({best_name}) saved → {MODELS_DIR}/best_model.pkl")
 
+    artifact_paths = [
+        os.path.join(MODELS_DIR, "best_model.pkl"),
+        os.path.join(MODELS_DIR, "scaler.pkl"),
+        os.path.join(MODELS_DIR, "loc_encoder.pkl"),
+        os.path.join(MODELS_DIR, "target_encoder.pkl"),
+        os.path.join(MODELS_DIR, "meta.json"),
+    ]
+    print_artifact_sizes(artifact_paths)
+    return artifact_paths
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # MAIN PIPELINE
@@ -929,7 +1292,7 @@ def run_pipeline(
     # ── STEP 1: Load, Validate, Clean, Engineer ────────────────────────────
     log.info("[Pipeline] Step 1 → Load / validate / clean / engineer…")
     try:
-        df, loc_enc, tgt_enc = load_and_engineer(csv_path)
+        df, loc_enc, tgt_enc, n_raw_rows = load_and_engineer(csv_path)
     except RuntimeError as exc:
         sys.exit(f"❌ Data pipeline failed:\n{exc}")
 
@@ -940,16 +1303,21 @@ def run_pipeline(
     # ── STEP 2: Preprocessing ─────────────────────────────────────────────
     log.info("[Pipeline] Step 2 → Preprocessing (split / scale / SMOTE)…")
     try:
-        X_train, X_test, y_train, y_test, scaler = preprocess(df, use_smote=use_smote)
+        X_train, X_test, y_train, y_test, scaler = preprocess(df, use_smote=use_smote, target_encoder=tgt_enc)
     except (ValueError, RuntimeError) as exc:
         sys.exit(f"❌ Preprocessing failed:\n{exc}")
     log.info(f"[Pipeline] Step 2 → Train: {X_train.shape}  Test: {X_test.shape}")
 
+    # ── STEP 2.5: Feature quality audit ────────────────────────────────────
+    print_feature_audit(df, FEATURE_COLS)
+
     # ── STEP 3: Train all models ──────────────────────────────────────────
     log.info("[Pipeline] Step 3 → Training classifiers…")
+    training_start = datetime.now()
     results = train_and_evaluate(
         get_models(), X_train, X_test, y_train, y_test, tgt_enc, cv_folds
     )
+    training_time_sec = (datetime.now() - training_start).total_seconds()
 
     # ── STEP 4: Compare ───────────────────────────────────────────────────
     log.info("[Pipeline] Step 4 → Building comparison table…")
@@ -959,6 +1327,7 @@ def run_pipeline(
 
     # ── STEP 5: Select best model ─────────────────────────────────────────
     metric    = TRAINING.get("selection_metric", "f1")
+    print_ranking_table(results, metric=metric)
     best_name = max(results, key=lambda n: results[n][metric])
     best      = results[best_name]
     print(f"\n🏆 Best Model: {best_name}  (by {metric})")
@@ -994,7 +1363,7 @@ def run_pipeline(
 
     # ── STEP 8: Save all artifacts ────────────────────────────────────────
     log.info("[Pipeline] Step 8 → Saving artifacts…")
-    save_artifacts(
+    artifact_paths = save_artifacts(
         best_name      = best_name,
         best_model     = best["model"],
         scaler         = scaler,
@@ -1004,6 +1373,20 @@ def run_pipeline(
         report_txt     = "\n".join(report_lines),
         n_records      = len(df),
         data_source    = "simulation" if simulate else "TomTom API",
+    )
+
+    print_final_report(
+        input_rows        = n_raw_rows,
+        rows_removed      = n_raw_rows - len(df),
+        rows_used         = len(df),
+        feature_cols      = FEATURE_COLS,
+        target_col        = TARGET_COL,
+        models_trained    = len(results),
+        best_name         = best_name,
+        best_f1           = best["f1"],
+        training_time_sec = training_time_sec,
+        artifact_paths    = artifact_paths,
+        status            = "SUCCESS",
     )
 
     print("\n✅ Pipeline complete. Artifacts saved.")
